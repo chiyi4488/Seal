@@ -116,6 +116,8 @@ class DownloadViewModel @Inject constructor() : ViewModel() {
                             downloadVideoWithInfo(info = info)
                         }
                     }
+
+                    else -> {}
                 }
             }.onFailure {
                 manageDownloadError(it, isFetchingInfo = true, isTaskAborted = true)

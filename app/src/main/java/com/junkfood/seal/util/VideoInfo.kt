@@ -1,11 +1,13 @@
 package com.junkfood.seal.util
 
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.math.roundToInt
 
 sealed interface YoutubeDLInfo
 
+@Immutable
 @Serializable
 data class VideoInfo(
     val id: String = "",
@@ -69,7 +71,13 @@ data class VideoInfo(
     @SerialName("requested_downloads") val requestedDownloads: List<RequestedDownload>? = null,
     val filename: String? = null,
     @SerialName("_type") val type: String? = null,
-) : YoutubeDLInfo
+) : YoutubeDLInfo {
+    fun isNotEmpty(): Boolean = !equals(EmptyVideoInfo)
+
+    companion object {
+        val EmptyVideoInfo = VideoInfo()
+    }
+}
 
 @Serializable
 data class Format(

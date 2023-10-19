@@ -103,7 +103,7 @@ import com.junkfood.seal.util.toFileSizeText
 @Composable
 fun DownloadPageImplV2(
     downloaderState: Downloader.State,
-    taskState: Downloader.DownloadTaskItem,
+    taskState: Downloader.DownloadTaskState,
     viewState: DownloadViewModel.ViewState,
     errorState: Downloader.ErrorState,
     showVideoCard: Boolean = false,
@@ -452,7 +452,7 @@ private fun DownloadPagePreview() {
         Column() {
             DownloadPageImplV2(
                 downloaderState = Downloader.State.DownloadingVideo,
-                taskState = Downloader.DownloadTaskItem(
+                taskState = Downloader.DownloadTaskState(
                     title = stringResource(R.string.video_title_sample_text),
                     uploader = stringResource(id = R.string.video_creator_sample_text),
                     progress = 0f,

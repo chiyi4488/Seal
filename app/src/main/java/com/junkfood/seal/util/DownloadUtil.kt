@@ -6,6 +6,7 @@ import android.os.Build
 import android.util.Log
 import android.webkit.CookieManager
 import androidx.annotation.CheckResult
+import androidx.compose.runtime.Immutable
 import com.junkfood.seal.App
 import com.junkfood.seal.App.Companion.audioDownloadDir
 import com.junkfood.seal.App.Companion.context
@@ -156,6 +157,7 @@ object DownloadUtil {
         addOption("--socket-timeout", "5")
     }.run { getVideoInfo(this) }
 
+    @Immutable
     data class DownloadPreferences(
         val extractAudio: Boolean = PreferenceUtil.getValue(EXTRACT_AUDIO),
         val createThumbnail: Boolean = PreferenceUtil.getValue(THUMBNAIL),

@@ -3,6 +3,7 @@ package com.junkfood.seal
 import android.app.PendingIntent
 import android.util.Log
 import androidx.annotation.CheckResult
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -10,6 +11,7 @@ import com.junkfood.seal.App.Companion.applicationScope
 import com.junkfood.seal.App.Companion.context
 import com.junkfood.seal.App.Companion.startService
 import com.junkfood.seal.App.Companion.stopService
+import com.junkfood.seal.Downloader.getInfoAndDownload
 import com.junkfood.seal.database.CommandTemplate
 import com.junkfood.seal.util.COMMAND_DIRECTORY
 import com.junkfood.seal.util.DownloadUtil
@@ -21,11 +23,14 @@ import com.junkfood.seal.util.PreferenceUtil.getString
 import com.junkfood.seal.util.ToastUtil
 import com.junkfood.seal.util.VideoClip
 import com.junkfood.seal.util.VideoInfo
+import com.junkfood.seal.util.VideoInfo.Companion.EmptyVideoInfo
 import com.junkfood.seal.util.toHttpsUrl
 import com.yausername.youtubedl_android.YoutubeDL
+import com.yausername.youtubedl_android.YoutubeDLException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
@@ -121,8 +126,105 @@ object Downloader {
         }
     }
 
+    val taskList = mutableStateListOf<DownloadTask>()
 
-    data class DownloadTaskItem(
+    data class DownloadTask(
+        private val initialState: DownloadTaskState,
+        private val preferences: DownloadUtil.DownloadPreferences = DownloadUtil.DownloadPreferences(),
+        private var videoInfo: VideoInfo = EmptyVideoInfo
+    ) {
+        private val _stateFlow: MutableStateFlow<DownloadTaskState> = MutableStateFlow(taskState)
+
+        val stateFlow: StateFlow<DownloadTaskState> = _stateFlow.asStateFlow()
+
+        val taskState: DownloadTaskState
+            get() = stateFlow.value
+
+
+
+        fun initializeVideoInfo(videoInfo: VideoInfo) {
+            this.videoInfo = videoInfo
+        }
+
+        private fun updateStateFlowFromVideoInfo() {
+            if (videoInfo.isNotEmpty()) {
+            }
+        }
+
+        fun cancel() {
+            if (!taskState.status.isCancellable()) return
+        }
+
+        fun fetchInfo() {
+            if (videoInfo.isNotEmpty()) return
+            _stateFlow.update { it.copy(status = DownloadTaskState.Status.FetchingInfo) }
+            DownloadUtil.fetchVideoInfoFromUrl(
+                url = taskState.playlistUrl.ifEmpty { taskState.webpageUrl },
+                playlistItem = taskState.playlistIndex,
+                preferences = preferences
+            )
+                .onFailure {
+                    // TODO: Manage error 
+                }
+                .onSuccess {
+                    // TODO: Update video info
+                }
+        }
+
+        private suspend fun downloadVideo(): Result<List<String>> {
+            if (!videoInfo.isNotEmpty()) {
+                return Result.failure(YoutubeDLException("Video info is empty!"))
+            }
+
+            val taskId = videoInfo.id + preferences.hashCode()
+            val notificationId = taskId.toNotificationId()
+
+
+            NotificationUtil.notifyProgress(
+                notificationId = notificationId, title = videoInfo.title
+            )
+
+            return DownloadUtil.downloadVideo(
+                videoInfo = videoInfo,
+                playlistUrl = taskState.playlistUrl,
+                playlistItem = taskState.playlistIndex,
+                downloadPreferences = preferences,
+                taskId = videoInfo.id + preferences.hashCode()
+            ) { progress, _, line ->
+                Log.d(TAG, line)
+                _stateFlow.update {
+                    it.copy(progress = progress, progressText = line)
+                }
+                NotificationUtil.notifyProgress(
+                    notificationId = notificationId,
+                    progress = progress.toInt(),
+                    text = line,
+                    title = videoInfo.title
+                )
+            }.onFailure {
+                // TODO: Manage Error: turn this task into error 
+            }.onSuccess {
+                val text =
+                    context.getString(if (it.isEmpty()) R.string.status_completed else R.string.download_finish_notification)
+                FileUtil.createIntentForOpeningFile(it.firstOrNull()).run {
+                    NotificationUtil.finishNotification(
+                        notificationId,
+                        title = videoInfo.title,
+                        text = text,
+                        intent = if (this != null) PendingIntent.getActivity(
+                            context,
+                            0,
+                            this,
+                            PendingIntent.FLAG_IMMUTABLE
+                        ) else null
+                    )
+                }
+            }
+        }
+
+    }
+
+    data class DownloadTaskState(
         val webpageUrl: String = "",
         val title: String = "",
         val uploader: String = "",
@@ -132,14 +234,33 @@ object Downloader {
         val progressText: String = "",
         val thumbnailUrl: String = "",
         val taskId: String = "",
+        val playlistUrl: String = "",
         val playlistIndex: Int = 0,
-    )
+        val status: Status = Status.Enqueued,
+    ) {
+        sealed interface Status {
+            data object Enqueued : Status
+            data object FetchingInfo : Status
+            data object Running : Status
+            data object Finished : Status
+            data object Cancelled : Status
+            data class Error(val errorReport: String) : Status
+
+            fun isCancellable(): Boolean = when (this) {
+                Cancelled -> false
+                is Error -> false
+                Finished -> false
+                else -> true
+            }
+
+        }
+    }
 
     private var currentJob: Job? = null
     private var downloadResultTemp: Result<List<String>> = Result.failure(Exception())
 
     private val mutableDownloaderState: MutableStateFlow<State> = MutableStateFlow(State.Idle)
-    private val mutableTaskState = MutableStateFlow(DownloadTaskItem())
+    private val mutableTaskState = MutableStateFlow(DownloadTaskState())
     private val mutablePlaylistResult = MutableStateFlow(PlaylistResult())
     private val mutableErrorState = MutableStateFlow(ErrorState())
     private val mutableProcessCount = MutableStateFlow(0)
@@ -260,8 +381,8 @@ object Downloader {
         }
 
 
-    private fun VideoInfo.toTask(playlistIndex: Int = 0, preferencesHash: Int): DownloadTaskItem =
-        DownloadTaskItem(
+    private fun VideoInfo.toTask(playlistIndex: Int = 0, preferencesHash: Int): DownloadTaskState =
+        DownloadTaskState(
             webpageUrl = webpageUrl.toString(),
             title = title,
             uploader = uploader ?: channel ?: uploaderId.toString(),
