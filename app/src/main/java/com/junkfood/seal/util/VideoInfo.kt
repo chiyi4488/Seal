@@ -72,7 +72,7 @@ data class VideoInfo(
     val filename: String? = null,
     @SerialName("_type") val type: String? = null,
 ) : YoutubeDLInfo {
-    fun isNotEmpty(): Boolean = !equals(EmptyVideoInfo)
+    fun isNotEmpty(): Boolean = this != (EmptyVideoInfo)
 
     companion object {
         val EmptyVideoInfo = VideoInfo()

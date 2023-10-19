@@ -116,17 +116,11 @@ object DownloadUtil {
         }
     }
 
-
-    @CheckResult
-    private fun getVideoInfo(request: YoutubeDLRequest): Result<VideoInfo> = request.runCatching {
-        val response: YoutubeDLResponse = YoutubeDL.getInstance().execute(request, null, null)
-        jsonFormat.decodeFromString(response.out)
-    }
-
-
-    @CheckResult
     fun fetchVideoInfoFromUrl(
-        url: String, playlistItem: Int = 0, preferences: DownloadPreferences = DownloadPreferences()
+        url: String,
+        playlistInfo: PlaylistInfo? = null,
+        preferences: DownloadPreferences = DownloadPreferences(),
+        taskId: String? = null
     ): Result<VideoInfo> = YoutubeDLRequest(url).apply {
         preferences.run {
             addOption("-o", BASENAME)
@@ -152,11 +146,20 @@ object DownloadUtil {
         addOption("--dump-json")
         addOption("-R", "1")
         addOption("--no-playlist")
-        if (playlistItem != 0) addOption("--playlist-items", playlistItem)
+        if (playlistInfo != null) addOption("--playlist-items", playlistInfo.index)
         else addOption("--playlist-items", "1")
         addOption("--socket-timeout", "5")
-    }.run { getVideoInfo(this) }
+    }.runCatching {
+        val response: YoutubeDLResponse = YoutubeDL.getInstance().execute(this, taskId, null)
+        jsonFormat.decodeFromString(response.out)
+    }
 
+    @Immutable
+    data class PlaylistInfo(val url: String, val index: Int)
+
+    /**
+     * User-defined download preferences read from the kv storage
+     */
     @Immutable
     data class DownloadPreferences(
         val extractAudio: Boolean = PreferenceUtil.getValue(EXTRACT_AUDIO),
@@ -359,7 +362,7 @@ object DownloadUtil {
     )
 
     private fun YoutubeDLRequest.addOptionsForAudioDownloads(
-        id: String, preferences: DownloadPreferences, playlistUrl: String
+        id: String, preferences: DownloadPreferences, playlistUrl: String?
     ): YoutubeDLRequest = this.apply {
         with(preferences) {
             addOption("-x")
@@ -407,7 +410,7 @@ object DownloadUtil {
             }
             addOption("--parse-metadata", "%(release_year,upload_date)s:%(meta_date)s")
 
-            if (playlistUrl.isNotEmpty()) {
+            if (playlistUrl != null) {
                 addOption("--parse-metadata", "%(album,playlist,title)s:%(meta_album)s")
                 addOption(
                     "--parse-metadata", "%(track_number,playlist_index)d:%(meta_track)s"
@@ -450,8 +453,7 @@ object DownloadUtil {
     @CheckResult
     fun downloadVideo(
         videoInfo: VideoInfo? = null,
-        playlistUrl: String = "",
-        playlistItem: Int = 0,
+        playlistInfo: PlaylistInfo? = null,
         taskId: String,
         downloadPreferences: DownloadPreferences,
         progressCallback: ((Float, Long, String) -> Unit)?
@@ -459,13 +461,10 @@ object DownloadUtil {
         if (videoInfo == null) return Result.failure(Throwable(context.getString(R.string.fetch_info_error_msg)))
 
         with(downloadPreferences) {
-            val url = playlistUrl.ifEmpty {
-                videoInfo.originalUrl ?: videoInfo.webpageUrl ?: return Result.failure(
-                    Throwable(
-                        context.getString(R.string.fetch_info_error_msg)
-                    )
-                )
-            }
+
+            val url = playlistInfo?.url ?: videoInfo.originalUrl ?: videoInfo.webpageUrl
+            ?: return Result.failure(Throwable(context.getString(R.string.fetch_info_error_msg)))
+
             val request = YoutubeDLRequest(url)
             val pathBuilder = StringBuilder()
 
@@ -489,8 +488,8 @@ object DownloadUtil {
                     addOption("-r", "${maxDownloadRate}K")
                 }
 
-                if (playlistItem != 0 && downloadPlaylist) {
-                    addOption("--playlist-items", playlistItem)
+                if (playlistInfo != null && downloadPlaylist) {
+                    addOption("--playlist-items", playlistInfo.index)
 //                    addOption("--compat-options", "no-youtube-unavailable-videos")
                 } else {
                     addOption("--no-playlist")
@@ -508,7 +507,7 @@ object DownloadUtil {
                     addOptionsForAudioDownloads(
                         id = videoInfo.id,
                         preferences = downloadPreferences,
-                        playlistUrl = playlistUrl
+                        playlistUrl = playlistInfo?.url
                     )
                 } else {
                     if (privateDirectory) pathBuilder.append(App.privateDownloadDir)
