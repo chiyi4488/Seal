@@ -126,25 +126,29 @@ object Downloader {
         }
     }
 
-    val taskList = Collections.synchronizedList(mutableListOf<DownloadTask>())
+    val taskList: MutableList<DownloadTask> =
+        Collections.synchronizedList(mutableListOf<DownloadTask>())
 
     var paused: Boolean = false
 
-    private fun startDownload() {
+    var MAX_INSTANCES_COUNT = 2
+
+    private fun startEnqueuedTask() {
         if (paused) return
 
-        taskList.firstOrNull()?.run {
-            when (taskState.status) {
+        taskList.forEach {
+            when (it.status) {
                 DownloadTask.State.Status.Enqueued -> {
-                    fetchInfo()
+                    it.fetchInfo()
+                    return
                 }
 
                 DownloadTask.State.Status.Ready -> {
-                    downloadVideo()
+                    it.downloadVideo()
+                    return
                 }
 
-                else -> return
-
+                else -> {}
             }
         }
     }
@@ -195,14 +199,17 @@ object Downloader {
 
         val stateFlow: StateFlow<State> = mStateFlow.asStateFlow()
 
-        val taskState: State
+        val state: State
             get() = stateFlow.value
 
+        val status: State.Status
+            get() = state.status
+
         fun cancel() {
-            if (!taskState.status.isCancellable()) return
+            if (!state.status.isCancellable()) return
             ToastUtil.makeToast(context.getString(R.string.task_canceled))
             currentJob?.cancel(CancellationException(context.getString(R.string.task_canceled)))
-            taskState.taskId.run {
+            state.taskId.run {
                 YoutubeDL.destroyProcessById(this)
                 NotificationUtil.cancelNotification(this.toNotificationId())
             }
@@ -213,10 +220,10 @@ object Downloader {
             if (videoInfo.isNotEmpty()) return Result.success(videoInfo)
             mStateFlow.update { it.copy(status = State.Status.FetchingInfo) }
             return DownloadUtil.fetchVideoInfoFromUrl(
-                url = taskState.playlistInfo?.url ?: taskState.url,
-                playlistInfo = taskState.playlistInfo,
+                url = state.playlistInfo?.url ?: state.url,
+                playlistInfo = state.playlistInfo,
                 preferences = preferences,
-                taskId = taskState.taskId
+                taskId = state.taskId
             ).onFailure {
                 manageError(it)
             }.onSuccess { info ->
@@ -237,22 +244,25 @@ object Downloader {
             }
         }
 
-        fun downloadVideo(): Result<List<String>> {
+        fun downloadVideo() {
             if (!videoInfo.isNotEmpty()) {
-                return Result.failure(YoutubeDLException("Video info is empty!"))
+                manageError(
+                    th = YoutubeDLException(message = "Video info is empty!"),
+                    status = state.status
+                )
             }
 
-            val notificationId = taskState.taskId.toNotificationId()
+            val notificationId = state.taskId.toNotificationId()
 
             NotificationUtil.notifyProgress(
                 notificationId = notificationId, title = videoInfo.title
             )
 
-            return DownloadUtil.downloadVideo(
+            DownloadUtil.downloadVideo(
                 videoInfo = videoInfo,
-                playlistInfo = taskState.playlistInfo,
+                playlistInfo = state.playlistInfo,
                 downloadPreferences = preferences,
-                taskId = taskState.taskId
+                taskId = state.taskId
             ) { progress, _, line ->
                 Log.d(TAG, line)
                 mStateFlow.update {
@@ -269,13 +279,13 @@ object Downloader {
                     text = line,
                     title = videoInfo.title
                 )
-            }.onFailure {
-                manageError(th = it)
-            }.onSuccess {
-                mStateFlow.update { state -> state.copy(status = State.Status.Finished(filePaths = it)) }
+            }.onFailure { th ->
+                manageError(th = th)
+            }.onSuccess { filePaths ->
+                mStateFlow.update { state -> state.copy(status = State.Status.Finished(filePaths = filePaths)) }
                 val text =
-                    context.getString(if (it.isEmpty()) R.string.status_completed else R.string.download_finish_notification)
-                FileUtil.createIntentForOpeningFile(it.firstOrNull()).run {
+                    context.getString(if (filePaths.isEmpty()) R.string.status_completed else R.string.download_finish_notification)
+                FileUtil.createIntentForOpeningFile(filePaths.firstOrNull()).run {
                     NotificationUtil.finishNotification(
                         notificationId,
                         title = videoInfo.title,
@@ -290,7 +300,7 @@ object Downloader {
 
         private fun manageError(
             th: Throwable,
-            status: State.Status = taskState.status,
+            status: State.Status = state.status,
         ) {
             if (th is YoutubeDL.CanceledException) return
             th.printStackTrace()
@@ -299,7 +309,7 @@ object Downloader {
             if (status == State.Status.FetchingInfo || status is State.Status.Running) {
                 mStateFlow.update { it.copy(status = State.Status.Error(th.message.toString())) }
                 this.moveToEndOfQueue()
-                taskState.taskId.toNotificationId().let {
+                state.taskId.toNotificationId().let {
                     NotificationUtil.finishNotification(
                         notificationId = it,
                         text = context.getString(resId),
@@ -441,7 +451,6 @@ object Downloader {
                 ), currentLine = errorReport, output = oldValue.output + "\n" + errorReport
             )
         }
-
 
 
     private fun VideoInfo.toTask(playlistIndex: Int = 0): DownloadTaskStateV1 = DownloadTaskStateV1(
