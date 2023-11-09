@@ -242,13 +242,13 @@ fun DownloadPageImplV2(
                         )
                     }
                 }
-                AnimatedVisibility(visible = errorState.isErrorOccurred()) {
-                    ErrorMessage(
-                        url = viewState.url,
-                        errorMessageResId = errorState.errorMessageResId,
-                        errorReport = errorState.errorReport
-                    )
-                }
+//                AnimatedVisibility(visible = errorState.isErrorOccurred()) {
+//                    ErrorMessage(
+//                        url = viewState.url,
+//                        errorMessageResId = errorState.errorMessageResId,
+//                        errorReport = errorState.errorReport
+//                    )
+//                }
                 content()
 //                val output = Downloader.mutableProcessOutput
 //                LazyRow() {

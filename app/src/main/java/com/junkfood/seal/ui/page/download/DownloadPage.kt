@@ -406,7 +406,7 @@ fun DownloadPageImpl(
                                 progress = progress,
                                 showCancelButton = downloaderState is Downloader.State.DownloadingPlaylist || downloaderState is Downloader.State.DownloadingVideo,
                                 onCancel = cancelCallback,
-                                fileSizeApprox = fileSizeApprox,
+                                fileSizeApprox = fileSize,
                                 duration = duration,
                                 onClick = onVideoCardClicked,
                                 isPreview = isPreview

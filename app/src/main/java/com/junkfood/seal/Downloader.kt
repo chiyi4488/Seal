@@ -133,18 +133,31 @@ object Downloader {
 
     var MAX_INSTANCES_COUNT = 2
 
-    private fun startEnqueuedTask() {
+    private val mInstanceCountStateFlow: MutableStateFlow<Int> = MutableStateFlow(0)
+
+    private val instanceCountStateFlow = mInstanceCountStateFlow.asStateFlow()
+
+    init {
+        applicationScope.launch(Dispatchers.IO) {
+            instanceCountStateFlow.collect {
+                if (it < MAX_INSTANCES_COUNT)
+                    startEnqueuedTask()
+            }
+        }
+    }
+
+    fun startEnqueuedTask() {
         if (paused) return
 
         taskList.forEach {
             when (it.status) {
-                DownloadTask.State.Status.Enqueued -> {
-                    it.fetchInfo()
+                DownloadTask.State.Status.Ready -> {
+                    it.downloadVideo()
                     return
                 }
 
-                DownloadTask.State.Status.Ready -> {
-                    it.downloadVideo()
+                DownloadTask.State.Status.Enqueued -> {
+                    it.fetchInfo()
                     return
                 }
 
@@ -214,11 +227,13 @@ object Downloader {
                 NotificationUtil.cancelNotification(this.toNotificationId())
             }
             mStateFlow.update { it.copy(status = State.Status.Canceled) }
+            mInstanceCountStateFlow.update { it - 1 }
         }
 
         fun fetchInfo(): Result<VideoInfo> {
             if (videoInfo.isNotEmpty()) return Result.success(videoInfo)
             mStateFlow.update { it.copy(status = State.Status.FetchingInfo) }
+            mInstanceCountStateFlow.update { it + 1 }
             return DownloadUtil.fetchVideoInfoFromUrl(
                 url = state.playlistInfo?.url ?: state.url,
                 playlistInfo = state.playlistInfo,
@@ -241,6 +256,8 @@ object Downloader {
                         )
                     }
                 }
+            }.also {
+                mInstanceCountStateFlow.update { it - 1 }
             }
         }
 
@@ -257,7 +274,7 @@ object Downloader {
             NotificationUtil.notifyProgress(
                 notificationId = notificationId, title = videoInfo.title
             )
-
+            mInstanceCountStateFlow.update { it + 1 }
             DownloadUtil.downloadVideo(
                 videoInfo = videoInfo,
                 playlistInfo = state.playlistInfo,
@@ -295,7 +312,8 @@ object Downloader {
                         ) else null
                     )
                 }
-            }
+                taskList.remove(this)
+            }.also { mInstanceCountStateFlow.update { it - 1 } }
         }
 
         private fun manageError(
@@ -316,6 +334,7 @@ object Downloader {
                     )
                 }
             }
+            mInstanceCountStateFlow.update { it - 1 }
         }
 
     }
