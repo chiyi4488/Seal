@@ -14,8 +14,10 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -23,24 +25,27 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Error
 import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Subscriptions
-import androidx.compose.material.icons.outlined.Terminal
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -56,10 +61,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -68,12 +77,14 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -88,7 +99,11 @@ import com.junkfood.seal.Downloader
 import com.junkfood.seal.R
 import com.junkfood.seal.ui.common.AsyncImageImpl
 import com.junkfood.seal.ui.component.ClearButton
+import com.junkfood.seal.ui.component.CustomCommandTaskItem
+import com.junkfood.seal.ui.component.FilterChipWithIcon
 import com.junkfood.seal.ui.component.NavigationBarSpacer
+import com.junkfood.seal.ui.component.TaskStatus
+import com.junkfood.seal.ui.component.greenScheme
 import com.junkfood.seal.ui.page.download.DownloadViewModel
 import com.junkfood.seal.ui.theme.SealTheme
 import com.junkfood.seal.util.PreferenceUtil
@@ -97,8 +112,12 @@ import com.junkfood.seal.util.WELCOME_DIALOG
 import com.junkfood.seal.util.toDurationText
 import com.junkfood.seal.util.toFileSizeText
 
+private const val TAG = "DownloadPageV2"
+
+data class Chip(val index: Int = 0, val name: String = "")
+
 @OptIn(
-    ExperimentalMaterial3Api::class
+    ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class
 )
 @Composable
 fun DownloadPageImplV2(
@@ -122,69 +141,78 @@ fun DownloadPageImplV2(
 ) {
     val hapticFeedback = LocalHapticFeedback.current
 
-    Scaffold(modifier = Modifier.fillMaxSize(), topBar = {
-        TopAppBar(title = {}, modifier = Modifier.padding(horizontal = 8.dp), navigationIcon = {
-            TooltipBox(state = rememberTooltipState(),
-                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                tooltip = {
-                    PlainTooltip {
-                        Text(text = stringResource(id = R.string.settings))
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.surface,
+        topBar = {
+            TopAppBar(
+                title = {},
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.padding(horizontal = 8.dp),
+                navigationIcon = {
+                    TooltipBox(state = rememberTooltipState(),
+                        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                        tooltip = {
+                            PlainTooltip {
+                                Text(text = stringResource(id = R.string.settings))
+                            }
+                        }) {
+                        IconButton(
+                            onClick = { navigateToSettings() }, modifier = Modifier
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Settings,
+                                contentDescription = stringResource(id = R.string.settings)
+                            )
+                        }
                     }
-                }) {
-                IconButton(
-                    onClick = { navigateToSettings() }, modifier = Modifier
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Settings,
-                        contentDescription = stringResource(id = R.string.settings)
-                    )
-                }
-            }
 
-        }, actions = {
-            BadgedBox(badge = {
-                if (processCount > 0) Badge(
-                    modifier = Modifier.offset(
-                        x = (-16).dp, y = (16).dp
-                    )
-                ) { Text("$processCount") }
-            }) {
-                TooltipBox(state = rememberTooltipState(),
-                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                    tooltip = {
-                        Text(text = stringResource(id = R.string.running_tasks))
+                },
+                actions = {
+/*                    BadgedBox(badge = {
+                        if (processCount > 0) Badge(
+                            modifier = Modifier.offset(
+                                x = (-16).dp, y = (16).dp
+                            )
+                        ) { Text("$processCount") }
                     }) {
-                    IconButton(
-                        onClick = { onNavigateToTaskList() }, modifier = Modifier
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Terminal,
-                            contentDescription = stringResource(id = R.string.running_tasks)
-                        )
+                        TooltipBox(state = rememberTooltipState(),
+                            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                            tooltip = {
+                                Text(text = stringResource(id = R.string.running_tasks))
+                            }) {
+                            IconButton(
+                                onClick = { onNavigateToTaskList() }, modifier = Modifier
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Terminal,
+                                    contentDescription = stringResource(id = R.string.running_tasks)
+                                )
+                            }
+                        }
+                    }*/
+                    TooltipBox(state = rememberTooltipState(),
+                        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                        tooltip = {
+                            Text(text = stringResource(id = R.string.downloads_history))
+                        }) {
+                        IconButton(
+                            onClick = { navigateToDownloads() }, modifier = Modifier
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Subscriptions,
+                                contentDescription = stringResource(id = R.string.downloads_history)
+                            )
+                        }
                     }
-                }
-            }
-            TooltipBox(state = rememberTooltipState(),
-                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                tooltip = {
-                    Text(text = stringResource(id = R.string.downloads_history))
-                }) {
-                IconButton(
-                    onClick = { navigateToDownloads() }, modifier = Modifier
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Subscriptions,
-                        contentDescription = stringResource(id = R.string.downloads_history)
-                    )
-                }
-            }
-        })
-    }, floatingActionButton = {
-        FABs(
-            modifier = with(receiver = Modifier) { if (showDownloadProgress) this else this.imePadding() },
-            downloadCallback = downloadCallback,
-        )
-    }) {
+                })
+        },
+        floatingActionButton = {
+            FABs(
+                modifier = with(receiver = Modifier) { if (showDownloadProgress) this else this.imePadding() },
+                downloadCallback = downloadCallback,
+            )
+        }) {
         Column(
             modifier = Modifier
                 .padding(it)
@@ -205,11 +233,51 @@ fun DownloadPageImplV2(
                     hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                 })
 
+            Spacer(modifier = Modifier.height(12.dp))
+
+
+            var chipList = remember {
+                mutableStateListOf(
+                    Chip(0, "Downloading"),
+                    Chip(1, "Enqueued"),
+                    Chip(2, "Canceled"),
+                    Chip(3, "Completed"),
+                    Chip(4, "Custom command")
+                )
+            }
+
+            var selectedChip by remember { mutableStateOf(-1) }
+
+            LazyRow(contentPadding = PaddingValues(horizontal = 20.dp)) {
+                items(chipList) { chip ->
+                    val selected = chip.index == selectedChip
+                    FilterChipWithIcon(
+                        selected = selected,
+                        onClick = {
+                            selectedChip = if (selected) -1 else chip.index
+                        },
+                        label = chip.name,
+                        selectedIcon = Icons.Outlined.Check
+                    )
+                }
+            }
+
+            if (selectedChip == 4)
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                ) {
+                    CustomCommandTaskItem(status = TaskStatus.RUNNING)
+                    CustomCommandTaskItem(status = TaskStatus.FINISHED)
+                    CustomCommandTaskItem(status = TaskStatus.ERROR)
+                    CustomCommandTaskItem(status = TaskStatus.CANCELED)
+                }
+
 
             Column(
                 Modifier
                     .padding(horizontal = 24.dp)
-                    .padding(top = 24.dp)
+                    .padding(top = 16.dp)
             ) {
                 with(taskState) {
                     AnimatedVisibility(
@@ -224,7 +292,21 @@ fun DownloadPageImplV2(
                             fileSizeApprox = fileSize,
                             duration = duration,
                             onClick = onVideoCardClicked,
-                            isPreview = isPreview
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(24.dp))
+                    AnimatedVisibility(
+                        visible = showDownloadProgress && showVideoCard
+                    ) {
+                        VideoCardV2(
+                            modifier = Modifier,
+                            title = title,
+                            author = uploader,
+                            thumbnailUrl = R.drawable.sample1,
+                            progress = 1f,
+                            fileSizeApprox = fileSize,
+                            duration = duration,
+                            onClick = onVideoCardClicked,
                         )
                     }
                     AnimatedVisibility(
@@ -249,6 +331,19 @@ fun DownloadPageImplV2(
 //                        errorReport = errorState.errorReport
 //                    )
 //                }
+                var expanded by remember { mutableStateOf(false) }
+
+
+                /*Column {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(text = "Download queue", style = MaterialTheme.typography.labelLarge)
+                    Surface(
+                        modifier = Modifier.height(if (expanded) 300.dp else 200.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow
+                    ) {}
+                }*/
+
+
                 content()
 //                val output = Downloader.mutableProcessOutput
 //                LazyRow() {
@@ -347,7 +442,12 @@ fun TitleWithProgressIndicator(
     onClick: () -> Unit = {},
     onLongClick: () -> Unit = {},
 ) {
-    Column(modifier = with(Modifier.padding(start = 12.dp, top = 24.dp)) {
+    Column(modifier = with(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .padding(top = 24.dp)
+    ) {
         if (showCancelOperation) this.clickable(
             interactionSource = remember { MutableInteractionSource() }, indication = null
         ) { onClick() } else this
@@ -372,7 +472,8 @@ fun TitleWithProgressIndicator(
                     )
                 }
             }
-        }/*        AnimatedVisibility(visible = showCancelOperation) {
+        }
+        /*        AnimatedVisibility (visible = showCancelOperation) {
                     Text(
                         if (isDownloadingPlaylist) stringResource(R.string.playlist_indicator_text).format(
                             currentIndex,
@@ -445,8 +546,8 @@ fun FABs(
 }
 
 @Composable
-@Preview(name = "Night", uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Preview(name = "Light", uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(name = "Night", uiMode = Configuration.UI_MODE_NIGHT_YES)
 private fun DownloadPagePreview() {
     SealTheme {
         Column() {
@@ -455,7 +556,7 @@ private fun DownloadPagePreview() {
                 taskState = Downloader.DownloadTaskStateV1(
                     title = stringResource(R.string.video_title_sample_text),
                     uploader = stringResource(id = R.string.video_creator_sample_text),
-                    progress = 0f,
+                    progress = 0.75f,
 
                     ),
                 viewState = DownloadViewModel.ViewState(),
@@ -530,13 +631,12 @@ fun VideoCardV2(
     progress: Float = 100f,
     fileSizeApprox: Double = 1024 * 1024 * 69.0,
     duration: Int = 359,
-    isPreview: Boolean = false
+    isPreview: Boolean = LocalInspectionMode.current
 ) {
-    Card(
+    ElevatedCard(
         modifier = modifier.fillMaxWidth(),
         onClick = { onClick() },
-        shape = MaterialTheme.shapes.small,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
     ) {
         Column {
             Box(Modifier.fillMaxWidth()) {
@@ -544,8 +644,7 @@ fun VideoCardV2(
                     modifier = Modifier
                         .padding()
                         .fillMaxWidth()
-                        .aspectRatio(16f / 9f, matchHeightConstraintsFirst = true)
-                        .clip(MaterialTheme.shapes.small),
+                        .aspectRatio(16 / 9f, matchHeightConstraintsFirst = true),
                     model = thumbnailUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
@@ -569,39 +668,83 @@ fun VideoCardV2(
                 }
 
             }
-
-            Column(
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                horizontalAlignment = Alignment.Start
+                    .padding(start = 16.dp)
+                    .padding(vertical = 12.dp)
             ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f),
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        modifier = Modifier.padding(top = 3.dp),
+                        text = author,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                val progressAnimationValue by animateFloatAsState(
+                    targetValue = progress,
+                    animationSpec = ProgressIndicatorDefaults.ProgressAnimationSpec
                 )
-                Text(
-                    modifier = Modifier.padding(top = 3.dp),
-                    text = author,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
+                if (progress >= 1f) {
+                    IconButton(onClick = { /*TODO*/ }) {
+                        Icon(
+                            imageVector = Icons.Rounded.CheckCircle,
+                            contentDescription = null,
+                            tint = greenScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                } else {
+                    Box() {
+                        CircularProgressIndicator(
+                            progress = progressAnimationValue,
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .size(24.dp),
+                            strokeWidth = 3.dp,
+                            strokeCap = StrokeCap.Round,
+                            trackColor = MaterialTheme.colorScheme.outlineVariant
+                        )
+                        IconButton(
+                            onClick = { /*TODO*/ }, modifier = Modifier.align(Alignment.Center)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Stop,
+                                contentDescription = stringResource(id = R.string.cancel),
+                                modifier = Modifier.size(12.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                    }
+
+                }
+                IconButton(onClick = { /*TODO*/ }) {
+                    Icon(imageVector = Icons.Outlined.MoreVert, contentDescription = null)
+                }
             }
-            val progressAnimationValue by animateFloatAsState(
-                targetValue = progress,
-                animationSpec = ProgressIndicatorDefaults.ProgressAnimationSpec
-            )
-            if (progress < 0f) LinearProgressIndicator(
-                modifier = Modifier.fillMaxWidth(),
-            )
-            else LinearProgressIndicator(
-                modifier = Modifier.fillMaxWidth(),
-                progress = progressAnimationValue / 100f,
-            )
+            /* if (progress < 0f) LinearProgressIndicator(
+                 modifier = Modifier.fillMaxWidth(),
+             )
+             else LinearProgressIndicator(
+                 modifier = Modifier.fillMaxWidth(),
+                 progress = progressAnimationValue / 100f,
+             )*/
         }
     }
 }

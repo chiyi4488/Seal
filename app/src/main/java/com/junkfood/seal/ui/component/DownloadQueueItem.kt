@@ -25,6 +25,7 @@ import androidx.compose.material.icons.outlined.UnfoldMore
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -58,9 +59,9 @@ import com.junkfood.seal.ui.common.LocalWindowWidthState
 import com.junkfood.seal.ui.theme.PreviewThemeLight
 import com.junkfood.seal.ui.theme.harmonizeWith
 import com.junkfood.seal.ui.theme.harmonizeWithPrimary
+import com.junkfood.seal.ui.theme.toDynamicColorScheme
 import com.kyant.monet.LocalTonalPalettes
 import com.kyant.monet.TonalPalettes.Companion.toTonalPalettes
-import com.kyant.monet.dynamicColorScheme
 
 
 @Composable
@@ -170,6 +171,9 @@ enum class TaskStatus {
 }
 
 val greenTonalPalettes = Color.Green.toTonalPalettes()
+val greenScheme: ColorScheme
+    @Composable get() = greenTonalPalettes.toDynamicColorScheme(!LocalDarkTheme.current.isDarkTheme())
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -190,7 +194,6 @@ fun CustomCommandTaskItem(
     onCancel: () -> Unit = {},
 ) {
     CompositionLocalProvider(LocalTonalPalettes provides greenTonalPalettes) {
-        val greenScheme = dynamicColorScheme(!LocalDarkTheme.current.isDarkTheme())
         val accentColor = MaterialTheme.colorScheme.run {
             when (status) {
                 TaskStatus.FINISHED -> greenScheme.primary

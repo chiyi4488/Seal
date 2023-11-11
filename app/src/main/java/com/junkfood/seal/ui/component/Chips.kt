@@ -145,7 +145,27 @@ fun VideoFilterChip(
     selected: Boolean,
     enabled: Boolean = true,
     onClick: () -> Unit,
-    label: String, leadingIcon: ImageVector? = null
+    label: String
+) {
+    FilterChip(
+        modifier = modifier.padding(horizontal = 4.dp),
+        selected = selected, enabled = enabled,
+        onClick = onClick,
+        label = {
+            Text(text = label)
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FilterChipWithIcon(
+    modifier: Modifier = Modifier,
+    selected: Boolean,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+    label: String,
+    selectedIcon: ImageVector? = null
 ) {
     FilterChip(
         modifier = modifier.padding(horizontal = 4.dp),
@@ -154,7 +174,19 @@ fun VideoFilterChip(
         label = {
             Text(text = label)
         },
-        leadingIcon = { leadingIcon?.let { Icon(imageVector = it, contentDescription = null) } }
+        leadingIcon = {
+            selectedIcon?.let {
+                Row {
+                    AnimatedVisibility(visible = selected) {
+                        Icon(
+                            imageVector = it,
+                            contentDescription = null,
+                            modifier = Modifier.size(FilterChipDefaults.IconSize)
+                        )
+                    }
+                }
+            }
+        }
     )
 }
 
