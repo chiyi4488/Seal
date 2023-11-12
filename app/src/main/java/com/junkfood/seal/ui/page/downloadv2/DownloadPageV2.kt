@@ -34,6 +34,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Error
 import androidx.compose.material.icons.outlined.FileDownload
@@ -64,7 +66,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -96,6 +100,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.junkfood.seal.App
 import com.junkfood.seal.Downloader
+import com.junkfood.seal.Downloader.DownloadTask.State.Status
 import com.junkfood.seal.R
 import com.junkfood.seal.ui.common.AsyncImageImpl
 import com.junkfood.seal.ui.component.ClearButton
@@ -111,6 +116,7 @@ import com.junkfood.seal.util.ToastUtil
 import com.junkfood.seal.util.WELCOME_DIALOG
 import com.junkfood.seal.util.toDurationText
 import com.junkfood.seal.util.toFileSizeText
+import kotlinx.coroutines.delay
 
 private const val TAG = "DownloadPageV2"
 
@@ -280,35 +286,8 @@ fun DownloadPageImplV2(
                     .padding(top = 16.dp)
             ) {
                 with(taskState) {
-                    AnimatedVisibility(
-                        visible = showDownloadProgress && showVideoCard
-                    ) {
-                        VideoCardV2(
-                            modifier = Modifier,
-                            title = title,
-                            author = uploader,
-                            thumbnailUrl = thumbnailUrl,
-                            progress = progress,
-                            fileSizeApprox = fileSize,
-                            duration = duration,
-                            onClick = onVideoCardClicked,
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(24.dp))
-                    AnimatedVisibility(
-                        visible = showDownloadProgress && showVideoCard
-                    ) {
-                        VideoCardV2(
-                            modifier = Modifier,
-                            title = title,
-                            author = uploader,
-                            thumbnailUrl = R.drawable.sample1,
-                            progress = 1f,
-                            fileSizeApprox = fileSize,
-                            duration = duration,
-                            onClick = onVideoCardClicked,
-                        )
-                    }
+                    VideoCardPreview()
+
                     AnimatedVisibility(
                         modifier = Modifier.fillMaxWidth(),
                         enter = expandVertically() + fadeIn(),
@@ -628,7 +607,7 @@ fun VideoCardV2(
     author: String = stringResource(R.string.video_creator_sample_text),
     thumbnailUrl: Any = "",
     onClick: () -> Unit = {},
-    progress: Float = 100f,
+    status: Status = Status.FetchingInfo,
     fileSizeApprox: Double = 1024 * 1024 * 69.0,
     duration: Int = 359,
     isPreview: Boolean = LocalInspectionMode.current
@@ -671,8 +650,8 @@ fun VideoCardV2(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .padding(start = 16.dp)
-                    .padding(vertical = 12.dp)
+                    .padding(start = 12.dp)
+                    .padding(vertical = 8.dp)
             ) {
 
 
@@ -683,68 +662,150 @@ fun VideoCardV2(
                 ) {
                     Text(
                         text = title,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleSmall,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         modifier = Modifier.padding(top = 3.dp),
                         text = author,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                val progressAnimationValue by animateFloatAsState(
-                    targetValue = progress,
-                    animationSpec = ProgressIndicatorDefaults.ProgressAnimationSpec
-                )
-                if (progress >= 1f) {
-                    IconButton(onClick = { /*TODO*/ }) {
-                        Icon(
-                            imageVector = Icons.Rounded.CheckCircle,
-                            contentDescription = null,
-                            tint = greenScheme.primary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                } else {
-                    Box() {
-                        CircularProgressIndicator(
-                            progress = progressAnimationValue,
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .size(24.dp),
-                            strokeWidth = 3.dp,
-                            strokeCap = StrokeCap.Round,
-                            trackColor = MaterialTheme.colorScheme.outlineVariant
-                        )
-                        IconButton(
-                            onClick = { /*TODO*/ }, modifier = Modifier.align(Alignment.Center)
-                        ) {
+
+                when (status) {
+                    Status.Canceled -> {
+                        IconButton(onClick = { }) {
                             Icon(
-                                imageVector = Icons.Rounded.Stop,
-                                contentDescription = stringResource(id = R.string.cancel),
-                                modifier = Modifier.size(12.dp),
-                                tint = MaterialTheme.colorScheme.primary
+                                imageVector = Icons.Filled.RestartAlt,
+                                contentDescription = stringResource(
+                                    id = R.string.restart
+                                )
                             )
                         }
-
                     }
 
+                    Status.Enqueued -> {
+                        ProgressIconButton(progress = PROGRESS_INDETERMINATE) {}
+                    }
+
+                    is Status.Error -> {
+                        IconButton(onClick = { /*TODO*/ }) {
+                            Icon(
+                                imageVector = Icons.Filled.Error,
+                                contentDescription = stringResource(
+                                    id = R.string.copy_error_report
+                                ),
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+
+                    Status.FetchingInfo -> {
+                        ProgressIconButton(progress = PROGRESS_INDETERMINATE) {}
+                    }
+
+                    is Status.Finished -> {
+                        IconButton(onClick = { /*TODO*/ }) {
+                            Icon(
+                                imageVector = Icons.Rounded.CheckCircle,
+                                contentDescription = null,
+                                tint = greenScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+
+                    Status.Ready -> {
+                        ProgressIconButton(progress = PROGRESS_INDETERMINATE) {}
+                    }
+
+                    is Status.Running -> {
+                        ProgressIconButton(progress = status.progress) {}
+                    }
                 }
+
                 IconButton(onClick = { /*TODO*/ }) {
                     Icon(imageVector = Icons.Outlined.MoreVert, contentDescription = null)
                 }
             }
-            /* if (progress < 0f) LinearProgressIndicator(
-                 modifier = Modifier.fillMaxWidth(),
-             )
-             else LinearProgressIndicator(
-                 modifier = Modifier.fillMaxWidth(),
-                 progress = progressAnimationValue / 100f,
-             )*/
         }
+    }
+}
+
+@Preview
+@Composable
+private fun VideoCardPreview() {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier
+    ) {
+        val drawableList =
+            listOf(R.drawable.sample, R.drawable.sample1, R.drawable.sample2, R.drawable.sample3)
+
+        var progress by remember { mutableFloatStateOf(0f) }
+
+        LaunchedEffect(Unit) {
+            while (true) {
+                delay(500)
+                if (progress == 1f) progress = 0f else progress += 0.2f
+            }
+        }
+
+        VideoCardV2(status = Status.Enqueued, thumbnailUrl = drawableList[0])
+        VideoCardV2(status = Status.Running(progress, ""), thumbnailUrl = drawableList[1])
+        VideoCardV2(status = Status.Finished(emptyList()), thumbnailUrl = drawableList[2])
+        VideoCardV2(status = Status.Canceled, thumbnailUrl = drawableList[3])
+        VideoCardV2(status = Status.Error(""), thumbnailUrl = drawableList[3])
+    }
+}
+
+private const val PROGRESS_INDETERMINATE = -1f
+
+@Composable
+private fun ProgressIconButton(
+    modifier: Modifier = Modifier,
+    progress: Float = PROGRESS_INDETERMINATE,
+    onClick: () -> Unit = {}
+) {
+    Box(modifier = modifier) {
+        if (progress >= 0) {
+            val progressAnimatedValue by animateFloatAsState(
+                targetValue = progress,
+                animationSpec = ProgressIndicatorDefaults.ProgressAnimationSpec,
+                label = "Progress"
+            )
+            CircularProgressIndicator(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(24.dp),
+                strokeWidth = 3.dp,
+                progress = progressAnimatedValue,
+                strokeCap = StrokeCap.Round,
+                trackColor = MaterialTheme.colorScheme.outlineVariant
+            )
+        } else {
+            CircularProgressIndicator(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(24.dp),
+                strokeWidth = 3.dp,
+                strokeCap = StrokeCap.Round,
+                trackColor = MaterialTheme.colorScheme.outlineVariant
+            )
+        }
+        IconButton(
+            onClick = onClick, modifier = Modifier.align(Alignment.Center)
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Stop,
+                contentDescription = stringResource(id = R.string.cancel),
+                modifier = Modifier.size(12.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+
     }
 }

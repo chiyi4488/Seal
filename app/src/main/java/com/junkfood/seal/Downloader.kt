@@ -140,8 +140,7 @@ object Downloader {
     init {
         applicationScope.launch(Dispatchers.IO) {
             instanceCountStateFlow.collect {
-                if (it < MAX_INSTANCES_COUNT)
-                    startEnqueuedTask()
+                if (it < MAX_INSTANCES_COUNT) startEnqueuedTask()
             }
         }
     }
@@ -152,12 +151,12 @@ object Downloader {
         taskList.forEach {
             when (it.status) {
                 DownloadTask.State.Status.Ready -> {
-                    it.downloadVideo()
+                    it.runningJob = applicationScope.launch(Dispatchers.IO) { it.downloadVideo() }
                     return
                 }
 
                 DownloadTask.State.Status.Enqueued -> {
-                    it.fetchInfo()
+                    it.runningJob = applicationScope.launch(Dispatchers.IO) { it.fetchInfo() }
                     return
                 }
 
@@ -173,8 +172,9 @@ object Downloader {
     data class DownloadTask(
         private val initialState: State,
         private val preferences: DownloadUtil.DownloadPreferences = DownloadUtil.DownloadPreferences(),
-        private var videoInfo: VideoInfo = EmptyVideoInfo
+        private var videoInfo: VideoInfo = EmptyVideoInfo,
     ) {
+        var runningJob: Job? = null
 
         data class State(
             val url: String = "",
@@ -201,9 +201,11 @@ object Downloader {
 
                 fun isCancellable(): Boolean = when (this) {
                     FetchingInfo -> true
+                    is Ready -> true
                     is Running -> true
                     else -> false
                 }
+
 
             }
         }
@@ -221,25 +223,27 @@ object Downloader {
         fun cancel() {
             if (!state.status.isCancellable()) return
             ToastUtil.makeToast(context.getString(R.string.task_canceled))
-            currentJob?.cancel(CancellationException(context.getString(R.string.task_canceled)))
+            runningJob?.cancel(CancellationException(context.getString(R.string.task_canceled)))
             state.taskId.run {
-                YoutubeDL.destroyProcessById(this)
+                if (YoutubeDL.destroyProcessById(this)) {
+                    mInstanceCountStateFlow.update { it - 1 }
+                }
                 NotificationUtil.cancelNotification(this.toNotificationId())
             }
             mStateFlow.update { it.copy(status = State.Status.Canceled) }
-            mInstanceCountStateFlow.update { it - 1 }
         }
 
-        fun fetchInfo(): Result<VideoInfo> {
-            if (videoInfo.isNotEmpty()) return Result.success(videoInfo)
+        suspend fun fetchInfo(): Result<VideoInfo> {
+            var res: Result<VideoInfo>? = null
+            if (videoInfo.isNotEmpty()) res = Result.success(videoInfo)
             mStateFlow.update { it.copy(status = State.Status.FetchingInfo) }
             mInstanceCountStateFlow.update { it + 1 }
-            return DownloadUtil.fetchVideoInfoFromUrl(
+            return (res ?: DownloadUtil.fetchVideoInfoFromUrl(
                 url = state.playlistInfo?.url ?: state.url,
                 playlistInfo = state.playlistInfo,
                 preferences = preferences,
                 taskId = state.taskId
-            ).onFailure {
+            )).onFailure {
                 manageError(it)
             }.onSuccess { info ->
                 videoInfo = info
@@ -264,8 +268,7 @@ object Downloader {
         fun downloadVideo() {
             if (!videoInfo.isNotEmpty()) {
                 manageError(
-                    th = YoutubeDLException(message = "Video info is empty!"),
-                    status = state.status
+                    th = YoutubeDLException(message = "Video info is empty!"), status = state.status
                 )
             }
 
@@ -285,8 +288,7 @@ object Downloader {
                 mStateFlow.update {
                     it.copy(
                         status = State.Status.Running(
-                            progress = progress,
-                            progressOutput = line
+                            progress = progress, progressOutput = line
                         )
                     )
                 }
@@ -600,8 +602,7 @@ object Downloader {
                 acc + (format.fileSize ?: format.fileSizeApprox ?: .0)
             }
 
-            val info = videoInfo
-                .run { if (fileSize != .0) copy(fileSize = fileSize) else this }
+            val info = videoInfo.run { if (fileSize != .0) copy(fileSize = fileSize) else this }
                 .run { if (newTitle.isNotEmpty()) copy(title = newTitle) else this }
 
             val audioOnly =
@@ -619,20 +620,15 @@ object Downloader {
             ).run {
                 copy(extractAudio = extractAudio || audioOnly)
             }.run {
-                selectedSubtitleLang.takeIf { it.isNotEmpty() }
-                    ?.let {
-                        val autoSubtitle = !info.subtitles.keys.containsAll(selectedSubtitleLang)
-                        copy(
-                            downloadSubtitle = true,
-                            autoSubtitle = autoSubtitle,
-                            subtitleLanguage = selectedSubtitleLang.joinToString(separator = ",") { it }
-                        )
-                    }
-                    ?: this
+                selectedSubtitleLang.takeIf { it.isNotEmpty() }?.let {
+                    val autoSubtitle = !info.subtitles.keys.containsAll(selectedSubtitleLang)
+                    copy(downloadSubtitle = true,
+                        autoSubtitle = autoSubtitle,
+                        subtitleLanguage = selectedSubtitleLang.joinToString(separator = ",") { it })
+                } ?: this
             }
             downloadResultTemp = downloadVideo(
-                videoInfo = info,
-                preferences = downloadPreferences
+                videoInfo = info, preferences = downloadPreferences
             )
         }
     }
@@ -726,8 +722,7 @@ object Downloader {
             for (i in indexList.indices) {
                 mutableDownloaderState.update {
                     if (it is State.DownloadingPlaylist) it.copy(
-                        currentItem = i + 1,
-                        itemCount = indexList.size
+                        currentItem = i + 1, itemCount = indexList.size
                     )
                     else return@launch
                 }
