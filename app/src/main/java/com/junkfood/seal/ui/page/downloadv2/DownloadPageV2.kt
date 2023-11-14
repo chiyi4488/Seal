@@ -73,6 +73,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -760,6 +761,7 @@ private fun VideoCardPreview() {
         VideoCardV2(status = Status.Canceled, thumbnailUrl = drawableList[3])
         VideoCardV2(status = Status.Error(""), thumbnailUrl = drawableList[3])
     }
+    Downloader.taskList.toMutableStateList()
 }
 
 private const val PROGRESS_INDETERMINATE = -1f

@@ -146,7 +146,9 @@ object Downloader {
     }
 
     fun startEnqueuedTask() {
-        if (paused) return
+        if (paused) {
+            return
+        }
 
         taskList.forEach {
             when (it.status) {
