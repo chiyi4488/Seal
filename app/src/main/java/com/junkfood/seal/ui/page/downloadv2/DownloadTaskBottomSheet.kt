@@ -1,8 +1,14 @@
 package com.junkfood.seal.ui.page.downloadv2
 
 import android.content.res.Configuration
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,16 +18,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Downloading
 import androidx.compose.material.icons.outlined.Error
+import androidx.compose.material.icons.outlined.FileOpen
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -41,8 +49,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.junkfood.seal.Downloader
 import com.junkfood.seal.R
@@ -66,7 +76,7 @@ fun DownloadTaskBottomSheet(taskState: Downloader.DownloadTask.State, onClick: (
             modifier = Modifier.padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val imageWeight = 0.3f
+            val imageWeight = 0.35f
             AsyncImageImpl(
                 model = taskState.thumbnailUrl,
                 contentDescription = null,
@@ -95,31 +105,89 @@ fun DownloadTaskBottomSheet(taskState: Downloader.DownloadTask.State, onClick: (
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                StatusBar(status = taskState.status)
+                AnimatedContent(targetState = taskState.status, transitionSpec = {
+                    (fadeIn(
+                        animationSpec = tween(
+                            220, 90
+                        )
+                    )).togetherWith(fadeOut(animationSpec = tween(90)))
+                }) {
+                    StatusBar(status = it, modifier = Modifier.padding(top = 3.dp))
+                }
 
             }
         }
         Spacer(modifier = Modifier.height(16.dp))
         HorizontalDivider()
-        LazyColumn {
-            item {
-                BottomSheetAction(
-                    icon = Icons.Outlined.AutoFixHigh,
-                    text = "Change status"
-                ) { onClick() }
+        Column {
+            AnimatedContent(targetState = taskState.status, transitionSpec = {
+                (fadeIn(animationSpec = tween(220, 90))).togetherWith(
+                    fadeOut(
+                        animationSpec = tween(
+                            90
+                        )
+                    )
+                )
+            }) {
+                when (it) {
+                    Downloader.DownloadTask.State.Status.Canceled -> {
+                        BottomSheetAction(
+                            icon = Icons.Outlined.RestartAlt,
+                            text = stringResource(id = R.string.restart)
+                        ) {
+
+                        }
+                    }
+
+                    is Downloader.DownloadTask.State.Status.Error -> {
+                        Column {
+                            BottomSheetAction(
+                                icon = Icons.Filled.Error,
+                                text = stringResource(id = R.string.copy_error_report)
+                            ) {
+
+                            }
+                            BottomSheetAction(
+                                icon = Icons.Outlined.RestartAlt,
+                                text = stringResource(id = R.string.restart)
+                            ) {
+
+                            }
+                        }
+                    }
+
+                    is Downloader.DownloadTask.State.Status.Finished -> {
+                        BottomSheetAction(
+                            icon = Icons.Outlined.FileOpen,
+                            text = stringResource(id = R.string.open_file)
+                        ) {
+
+                        }
+                    }
+
+                    is Downloader.DownloadTask.State.Status.Running -> {
+                        BottomSheetAction(
+                            icon = Icons.Outlined.Cancel,
+                            text = stringResource(id = R.string.cancel)
+                        ) {
+
+                        }
+                    }
+
+                    else -> {}
+                }
+
             }
-            item {
-                BottomSheetAction(
-                    icon = Icons.Outlined.ContentCopy,
-                    text = stringResource(id = R.string.copy_link)
-                ) {}
-            }
-            item {
-                BottomSheetAction(icon = Icons.Outlined.Image, text = "View thumbnail") {}
-            }
-            item {
-                BottomSheetAction(icon = Icons.Outlined.Delete, text = "Remove from queue") {}
-            }
+            BottomSheetAction(
+                icon = Icons.Outlined.AutoFixHigh, text = "Change status"
+            ) { onClick() }
+
+            BottomSheetAction(
+                icon = Icons.Outlined.ContentCopy, text = stringResource(id = R.string.copy_link)
+            ) {}
+            BottomSheetAction(icon = Icons.Outlined.Image, text = "View thumbnail") {}
+            BottomSheetAction(icon = Icons.Outlined.Delete, text = "Remove from queue") {}
+
         }
     }
 }
@@ -190,13 +258,34 @@ private fun StatusBarPreview() {
     SealTheme {
         Surface {
             Column {
-                StatusBar(status = Downloader.DownloadTask.State.Status.Enqueued)
-                StatusBar(status = Downloader.DownloadTask.State.Status.FetchingInfo)
-                StatusBar(status = Downloader.DownloadTask.State.Status.Ready)
-                StatusBar(status = Downloader.DownloadTask.State.Status.Running(0.73f))
-                StatusBar(status = Downloader.DownloadTask.State.Status.Finished(emptyList()))
-                StatusBar(status = Downloader.DownloadTask.State.Status.Canceled)
-                StatusBar(status = Downloader.DownloadTask.State.Status.Error(""))
+                StatusBar(
+                    status = Downloader.DownloadTask.State.Status.Enqueued,
+                    modifier = Modifier.padding(top = 3.dp)
+                )
+                StatusBar(
+                    status = Downloader.DownloadTask.State.Status.FetchingInfo,
+                    modifier = Modifier.padding(top = 3.dp)
+                )
+                StatusBar(
+                    status = Downloader.DownloadTask.State.Status.Ready,
+                    modifier = Modifier.padding(top = 3.dp)
+                )
+                StatusBar(
+                    status = Downloader.DownloadTask.State.Status.Running(0.73f),
+                    modifier = Modifier.padding(top = 3.dp)
+                )
+                StatusBar(
+                    status = Downloader.DownloadTask.State.Status.Finished(emptyList()),
+                    modifier = Modifier.padding(top = 3.dp)
+                )
+                StatusBar(
+                    status = Downloader.DownloadTask.State.Status.Canceled,
+                    modifier = Modifier.padding(top = 3.dp)
+                )
+                StatusBar(
+                    status = Downloader.DownloadTask.State.Status.Error(""),
+                    modifier = Modifier.padding(top = 3.dp)
+                )
 
 
             }
@@ -205,12 +294,17 @@ private fun StatusBarPreview() {
 }
 
 @Composable
-fun StatusBar(status: Downloader.DownloadTask.State.Status) {
+fun StatusBar(
+    status: Downloader.DownloadTask.State.Status,
+    modifier: Modifier = Modifier,
+    iconSize: DpSize = DpSize(height = 18.dp, width = 18.dp),
+    textStyle: TextStyle = MaterialTheme.typography.labelMedium
+) {
     Row(
-        verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 3.dp)
+        verticalAlignment = Alignment.CenterVertically, modifier = modifier
     ) {
-        StatusBarIcon(status = status)
-        StatusBarText(status = status)
+        StatusBarIcon(status = status, iconSize = iconSize)
+        StatusBarText(status = status, textStyle = textStyle)
 
     }
 
@@ -219,83 +313,87 @@ fun StatusBar(status: Downloader.DownloadTask.State.Status) {
 
 
 @Composable
-private fun StatusBarIcon(status: Downloader.DownloadTask.State.Status) {
-    when (status) {
-        Downloader.DownloadTask.State.Status.Canceled -> {
-            Icon(
-                imageVector = Icons.Outlined.Cancel,
-                modifier = Modifier
-                    .padding(end = 6.dp)
-                    .size(14.dp),
-                contentDescription = null
-            )
-        }
+private fun StatusBarIcon(
+    status: Downloader.DownloadTask.State.Status,
+    iconSize: DpSize
+) {
+    Box(
+        modifier = Modifier
+            .height(iconSize.height)
+            .padding(end = 6.dp)
+    ) {
+        when (status) {
+            Downloader.DownloadTask.State.Status.Canceled -> {
+                Icon(
+                    imageVector = Icons.Outlined.Cancel,
+                    modifier = Modifier.size(iconSize),
+                    contentDescription = null
+                )
+            }
 
-        Downloader.DownloadTask.State.Status.Enqueued -> {
-            Icon(
-                imageVector = Icons.Outlined.Downloading,
-                modifier = Modifier
-                    .padding(end = 6.dp)
-                    .size(14.dp),
-                contentDescription = null
-            )
-        }
+            Downloader.DownloadTask.State.Status.Enqueued -> {
+                Icon(
+                    imageVector = Icons.Outlined.Downloading,
+                    modifier = Modifier.size(iconSize),
+                    contentDescription = null
+                )
+            }
 
-        is Downloader.DownloadTask.State.Status.Error -> {
-            Icon(
-                imageVector = Icons.Outlined.Error,
-                modifier = Modifier
-                    .padding(end = 6.dp)
-                    .size(14.dp),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.error
-            )
-        }
+            is Downloader.DownloadTask.State.Status.Error -> {
+                Icon(
+                    imageVector = Icons.Outlined.Error,
+                    modifier = Modifier.size(iconSize),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
 
-        Downloader.DownloadTask.State.Status.FetchingInfo -> {
-            CircularProgressIndicator(
-                modifier = Modifier
-                    .padding(end = 6.dp)
-                    .size(14.dp), strokeWidth = 2.5f.dp
-            )
-        }
+            Downloader.DownloadTask.State.Status.FetchingInfo -> {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .size(iconSize)
+                        .padding(1.dp)
+                        .align(Alignment.Center), strokeWidth = 2.5f.dp
+                )
+            }
 
-        is Downloader.DownloadTask.State.Status.Finished -> {
-            Icon(
-                imageVector = Icons.Filled.CheckCircle,
-                modifier = Modifier
-                    .padding(end = 6.dp)
-                    .size(14.dp),
-                contentDescription = null,
-                tint = greenScheme.primary
-            )
-        }
+            is Downloader.DownloadTask.State.Status.Finished -> {
+                Icon(
+                    imageVector = Icons.Filled.CheckCircle,
+                    modifier = Modifier.size(iconSize),
+                    contentDescription = null,
+                    tint = greenScheme.primary
+                )
+            }
 
-        Downloader.DownloadTask.State.Status.Ready -> {
-            Icon(
-                imageVector = Icons.Outlined.Downloading,
-                modifier = Modifier
-                    .padding(end = 6.dp)
-                    .size(14.dp),
-                contentDescription = null
-            )
-        }
+            Downloader.DownloadTask.State.Status.Ready -> {
+                Icon(
+                    imageVector = Icons.Outlined.Downloading,
+                    modifier = Modifier.size(iconSize),
+                    contentDescription = null
+                )
+            }
 
-        is Downloader.DownloadTask.State.Status.Running -> {
-            CircularProgressIndicator(
-                modifier = Modifier
-                    .padding(end = 6.dp)
-                    .size(14.dp),
-                progress = status.progress,
-                strokeWidth = 2.5f.dp
-            )
+            is Downloader.DownloadTask.State.Status.Running -> {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .size(iconSize)
+                        .padding(1.dp)
+                        .align(Alignment.Center),
+                    progress = status.progress,
+                    strokeWidth = 2.5f.dp
+                )
+            }
         }
     }
+
 
 }
 
 @Composable
-fun StatusBarText(status: Downloader.DownloadTask.State.Status) {
+fun StatusBarText(
+    status: Downloader.DownloadTask.State.Status, textStyle: TextStyle
+) {
     val textColor = when (status) {
         is Downloader.DownloadTask.State.Status.Error -> {
             MaterialTheme.colorScheme.error
@@ -346,7 +444,7 @@ fun StatusBarText(status: Downloader.DownloadTask.State.Status) {
 
     Text(
         text = text,
-        style = MaterialTheme.typography.labelMedium,
+        style = textStyle,
         color = textColor,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,

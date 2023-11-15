@@ -3,15 +3,12 @@ package com.junkfood.seal.ui.page.downloadv2
 
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -30,21 +27,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.Error
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Subscriptions
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Stop
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
@@ -52,9 +46,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.material3.Scaffold
@@ -73,47 +65,33 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusDirection
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalInspectionMode
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import com.junkfood.seal.App
 import com.junkfood.seal.Downloader
 import com.junkfood.seal.Downloader.DownloadTask.State.Status
 import com.junkfood.seal.R
 import com.junkfood.seal.ui.common.AsyncImageImpl
-import com.junkfood.seal.ui.component.ClearButton
 import com.junkfood.seal.ui.component.CustomCommandTaskItem
 import com.junkfood.seal.ui.component.FilterChipWithIcon
+import com.junkfood.seal.ui.component.HorizontalDivider
 import com.junkfood.seal.ui.component.NavigationBarSpacer
 import com.junkfood.seal.ui.component.TaskStatus
 import com.junkfood.seal.ui.component.greenScheme
 import com.junkfood.seal.ui.page.download.DownloadViewModel
 import com.junkfood.seal.ui.theme.SealTheme
 import com.junkfood.seal.util.PreferenceUtil
-import com.junkfood.seal.util.ToastUtil
 import com.junkfood.seal.util.WELCOME_DIALOG
 import com.junkfood.seal.util.toDurationText
 import com.junkfood.seal.util.toFileSizeText
@@ -147,14 +125,14 @@ fun DownloadPageImplV2(
     content: @Composable () -> Unit
 ) {
     val hapticFeedback = LocalHapticFeedback.current
-
+    val backgroundColor = MaterialTheme.colorScheme.surface
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = backgroundColor,
         topBar = {
             TopAppBar(
                 title = {},
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = backgroundColor),
                 modifier = Modifier.padding(horizontal = 8.dp),
                 navigationIcon = {
                     TooltipBox(state = rememberTooltipState(),
@@ -176,28 +154,6 @@ fun DownloadPageImplV2(
 
                 },
                 actions = {
-/*                    BadgedBox(badge = {
-                        if (processCount > 0) Badge(
-                            modifier = Modifier.offset(
-                                x = (-16).dp, y = (16).dp
-                            )
-                        ) { Text("$processCount") }
-                    }) {
-                        TooltipBox(state = rememberTooltipState(),
-                            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                            tooltip = {
-                                Text(text = stringResource(id = R.string.running_tasks))
-                            }) {
-                            IconButton(
-                                onClick = { onNavigateToTaskList() }, modifier = Modifier
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Terminal,
-                                    contentDescription = stringResource(id = R.string.running_tasks)
-                                )
-                            }
-                        }
-                    }*/
                     TooltipBox(state = rememberTooltipState(),
                         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
                         tooltip = {
@@ -224,7 +180,6 @@ fun DownloadPageImplV2(
             modifier = Modifier
                 .padding(it)
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
         ) {
             TitleWithProgressIndicator(showProgressIndicator = downloaderState is Downloader.State.FetchingInfo,
                 isDownloadingPlaylist = downloaderState is Downloader.State.DownloadingPlaylist,
@@ -255,7 +210,7 @@ fun DownloadPageImplV2(
 
             var selectedChip by remember { mutableStateOf(-1) }
 
-            LazyRow(contentPadding = PaddingValues(horizontal = 20.dp)) {
+            LazyRow(contentPadding = PaddingValues(horizontal = 18.dp)) {
                 items(chipList) { chip ->
                     val selected = chip.index == selectedChip
                     FilterChipWithIcon(
@@ -267,6 +222,22 @@ fun DownloadPageImplV2(
                         selectedIcon = Icons.Outlined.Check
                     )
                 }
+            }
+            Row(
+                modifier = Modifier.padding(start = 24.dp, top = 16.dp, end = 20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = "35 Downloading", style = MaterialTheme.typography.labelMedium)
+                Spacer(modifier = Modifier.weight(1f))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = "Recently Added", style = MaterialTheme.typography.labelMedium)
+                    Icon(
+                        imageVector = Icons.Outlined.ArrowDropDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
             }
 
             if (selectedChip == 4)
@@ -283,12 +254,13 @@ fun DownloadPageImplV2(
 
             Column(
                 Modifier
-                    .padding(horizontal = 24.dp)
-                    .padding(top = 16.dp)
+//                    .padding(horizontal = 24.dp)
+                    .verticalScroll(rememberScrollState())
             ) {
+                Spacer(modifier = Modifier.height(12.dp))
                 with(taskState) {
-                    VideoCardPreview()
-
+                    content()
+//                    VideoCardPreview()
                     AnimatedVisibility(
                         modifier = Modifier.fillMaxWidth(),
                         enter = expandVertically() + fadeIn(),
@@ -304,41 +276,9 @@ fun DownloadPageImplV2(
                         )
                     }
                 }
-//                AnimatedVisibility(visible = errorState.isErrorOccurred()) {
-//                    ErrorMessage(
-//                        url = viewState.url,
-//                        errorMessageResId = errorState.errorMessageResId,
-//                        errorReport = errorState.errorReport
-//                    )
-//                }
-                var expanded by remember { mutableStateOf(false) }
 
 
-                /*Column {
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Text(text = "Download queue", style = MaterialTheme.typography.labelLarge)
-                    Surface(
-                        modifier = Modifier.height(if (expanded) 300.dp else 200.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerLow
-                    ) {}
-                }*/
 
-
-                content()
-//                val output = Downloader.mutableProcessOutput
-//                LazyRow() {
-//                    items(output.toList()) { entry ->
-//                        TextField(
-//                            value = entry.second,
-//                            label = { Text(entry.first) },
-//                            onValueChange = {},
-//                            readOnly = true,
-//                            minLines = 10,
-//                            maxLines = 10,
-//                        )
-//                    }
-//                }
-//                    PreviewFormat()
                 NavigationBarSpacer()
                 Spacer(modifier = Modifier.height(160.dp))
             }
@@ -346,70 +286,6 @@ fun DownloadPageImplV2(
     }
 }
 
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
-@Composable
-fun InputUrl(
-    url: String,
-    error: Boolean,
-    showDownloadProgress: Boolean = false,
-    progress: Float,
-    onDone: () -> Unit,
-    onValueChange: (String) -> Unit
-) {
-    val focusRequester = remember { FocusRequester() }
-    val focusManager = LocalFocusManager.current
-    val softwareKeyboardController = LocalSoftwareKeyboardController.current
-    OutlinedTextField(
-        value = url,
-        isError = error,
-        onValueChange = onValueChange,
-        label = { Text(stringResource(R.string.video_url)) },
-        modifier = Modifier
-            .padding(0f.dp, 16f.dp)
-            .fillMaxWidth()
-            .focusRequester(focusRequester),
-        textStyle = MaterialTheme.typography.bodyLarge,
-        maxLines = 3,
-        trailingIcon = {
-            if (url.isNotEmpty()) ClearButton { onValueChange("") }
-//            else PasteUrlButton { onPaste() }
-        },
-        keyboardActions = KeyboardActions(onDone = {
-            softwareKeyboardController?.hide()
-            focusManager.moveFocus(FocusDirection.Down)
-            onDone()
-        }),
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
-    )
-    AnimatedVisibility(visible = showDownloadProgress) {
-        Row(
-            Modifier.padding(0.dp, 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            val progressAnimationValue by animateFloatAsState(
-                targetValue = progress / 100f,
-                animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
-            )
-            if (progressAnimationValue < 0) LinearProgressIndicator(
-                modifier = Modifier
-                    .weight(0.75f)
-                    .clip(MaterialTheme.shapes.large),
-            )
-            else LinearProgressIndicator(
-                progress = progressAnimationValue,
-                modifier = Modifier
-                    .weight(0.75f)
-                    .clip(MaterialTheme.shapes.large),
-            )
-            Text(
-                text = if (progress < 0) "0%" else "$progress%",
-                textAlign = TextAlign.Center,
-                modifier = Modifier.weight(0.25f)
-            )
-        }
-    }
-}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -468,40 +344,6 @@ fun TitleWithProgressIndicator(
     }
 }
 
-@Composable
-fun ErrorMessage(
-    modifier: Modifier = Modifier,
-    url: String,
-    errorReport: String = "",
-    errorMessageResId: Int,
-) {
-    val clipboardManager = LocalClipboardManager.current
-    val context = LocalContext.current
-    Row(modifier = modifier
-        .padding(top = 8.dp)
-        .fillMaxWidth()
-        .run {
-            if (errorReport.isNotEmpty()) {
-                clip(MaterialTheme.shapes.large).clickable {
-                    clipboardManager.setText(AnnotatedString(App.getVersionReport() + "\nURL: $url\n$errorReport"))
-                    ToastUtil.makeToastSuspend(context.getString(R.string.error_copied))
-                }
-            } else this
-        }
-        .padding(horizontal = 8.dp, vertical = 8.dp)) {
-        Icon(
-            Icons.Outlined.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error
-        )
-        Text(
-            maxLines = 10,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(start = 6.dp),
-            text = errorReport.ifEmpty { stringResource(id = errorMessageResId) },
-            color = MaterialTheme.colorScheme.error
-        )
-    }
-}
-
 
 @Composable
 fun FABs(
@@ -546,54 +388,34 @@ private fun DownloadPagePreview() {
                 showDownloadProgress = true,
                 showVideoCard = true
             ) {
-
+                VideoCardPreview()
             }
         }
     }
 }
 
 @Composable
-fun NextTask() {
-    Column {
+@Preview(name = "Light", uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(name = "Night", uiMode = Configuration.UI_MODE_NIGHT_YES)
+private fun DownloadPageCompactPreview() {
+    SealTheme {
+        Column() {
+            DownloadPageImplV2(
+                downloaderState = Downloader.State.DownloadingVideo,
+                taskState = Downloader.DownloadTaskStateV1(
+                    title = stringResource(R.string.video_title_sample_text),
+                    uploader = stringResource(id = R.string.video_creator_sample_text),
+                    progress = 0.75f,
 
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "Next download task",
-            style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier.padding(start = 8.dp)
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Card(
-            shape = MaterialTheme.shapes.small,
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
-        ) {
-            Row {
-                Image(
-                    painter = painterResource(id = R.drawable.sample2),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .aspectRatio(16f / 9f)
-                        .weight(2f)
-                        .clip(MaterialTheme.shapes.small),
-                    contentScale = ContentScale.Crop
-                )
-                Column(
-                    modifier = Modifier
-                        .weight(4f)
-                        .padding(8.dp)
-                ) {
-                    Text(
-                        text = stringResource(R.string.video_title_sample_text),
-                        style = MaterialTheme.typography.titleSmall,
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
-                    Text(
-                        text = stringResource(id = R.string.video_creator_sample_text),
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
-                }
+                    ),
+                viewState = DownloadViewModel.ViewState(),
+                errorState = Downloader.ErrorState(errorReport = "This is an error report!"),
+                processCount = 2,
+                isPreview = true,
+                showDownloadProgress = true,
+                showVideoCard = true
+            ) {
+                VideoCardCompactPreview()
             }
         }
     }
@@ -616,7 +438,7 @@ fun VideoCardV2(
     ElevatedCard(
         modifier = modifier.fillMaxWidth(),
         onClick = { onClick() },
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
     ) {
         Column {
             Box(Modifier.fillMaxWidth()) {
@@ -624,7 +446,7 @@ fun VideoCardV2(
                     modifier = Modifier
                         .padding()
                         .fillMaxWidth()
-                        .aspectRatio(16 / 9f, matchHeightConstraintsFirst = true),
+                        .aspectRatio(16 / 9f, matchHeightConstraintsFirst = false),
                     model = thumbnailUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
@@ -737,12 +559,129 @@ fun VideoCardV2(
     }
 }
 
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun VideoCardCompactV2(
+    modifier: Modifier = Modifier,
+    title: String = stringResource(R.string.video_title_sample_text),
+    author: String = stringResource(R.string.video_creator_sample_text),
+    thumbnailUrl: Any = "",
+    onClick: () -> Unit = {},
+    status: Status = Status.FetchingInfo,
+    fileSizeApprox: Double = 1024 * 1024 * 69.0,
+    duration: Int = 359,
+) {
+
+    Surface(
+        modifier = modifier.padding(horizontal = 20.dp),
+//        shape = MaterialTheme.shapes.extraSmall,
+//        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+//        onClick = { onClick() },
+//        color = MaterialTheme.colorScheme.surfaceContainerLowest
+    ) {
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 0.dp, vertical = 0.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+//                        .padding(vertical = 12.dp)
+//                        .padding(start = 12.dp)
+                ) {
+                    AsyncImageImpl(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .height(80.dp)
+                            .aspectRatio(16 / 9f, matchHeightConstraintsFirst = true)
+                            .clip(MaterialTheme.shapes.extraSmall),
+                        model = thumbnailUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                    )
+                    Surface(
+                        modifier = Modifier
+                            .padding(4.dp)
+                            .align(Alignment.BottomEnd),
+                        color = Color.Black.copy(alpha = 0.68f),
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        val fileSizeText = fileSizeApprox.toFileSizeText()
+                        val durationText = duration.toDurationText()
+                        Text(
+                            modifier = Modifier.padding(horizontal = 4.dp),
+                            text = "$fileSizeText · $durationText",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White
+                        )
+                    }
+
+                }
+
+                Column(
+                    modifier = Modifier
+                        .padding(horizontal = 12.dp),
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    Text(
+                        text = title.repeat(2),
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        modifier = Modifier.padding(top = 2.dp),
+                        text = author,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.weight(1f, false))
+                    StatusBar(
+                        status = status,
+                        modifier = Modifier.padding(top = 3.dp),
+                        textStyle = MaterialTheme.typography.labelMedium,
+                        iconSize = DpSize(14.dp, 14.dp)
+                    )
+                }
+
+            }
+
+            IconButton(
+                onClick = { /*TODO*/ },
+                modifier = Modifier
+                    .padding(4.dp)
+                    .size(24.dp)
+                    .align(Alignment.BottomEnd)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.MoreVert,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+
+
+    }
+    HorizontalDivider()
+
+
+}
+
+
 @Preview
 @Composable
 private fun VideoCardPreview() {
     Column(
-        verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier
-    ) {
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.padding(horizontal = 24.dp),
+
+        ) {
         val drawableList =
             listOf(R.drawable.sample, R.drawable.sample1, R.drawable.sample2, R.drawable.sample3)
 
@@ -761,7 +700,48 @@ private fun VideoCardPreview() {
         VideoCardV2(status = Status.Canceled, thumbnailUrl = drawableList[3])
         VideoCardV2(status = Status.Error(""), thumbnailUrl = drawableList[3])
     }
-    Downloader.taskList.toMutableStateList()
+}
+
+@Preview
+@Composable
+private fun VideoCardCompactPreview() {
+
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier
+            .padding(top = 12.dp)
+    ) {
+        val drawableList =
+            listOf(
+                R.drawable.sample,
+                R.drawable.sample1,
+                R.drawable.sample2,
+                R.drawable.sample3
+            )
+
+        var progress by remember { mutableFloatStateOf(0f) }
+
+        LaunchedEffect(Unit) {
+            while (true) {
+                delay(500)
+                if (progress == 1f) progress = 0f else progress += 0.2f
+            }
+        }
+
+        VideoCardCompactV2(status = Status.Enqueued, thumbnailUrl = drawableList[0])
+        VideoCardCompactV2(
+            status = Status.Running(progress, ""),
+            thumbnailUrl = drawableList[1]
+        )
+        VideoCardCompactV2(
+            status = Status.Finished(emptyList()),
+            thumbnailUrl = drawableList[2]
+        )
+        VideoCardCompactV2(status = Status.Canceled, thumbnailUrl = drawableList[3])
+        VideoCardCompactV2(status = Status.Error(""), thumbnailUrl = drawableList[3])
+    }
+
 }
 
 private const val PROGRESS_INDETERMINATE = -1f
