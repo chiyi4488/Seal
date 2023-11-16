@@ -2,6 +2,7 @@ package com.junkfood.seal.ui.page.downloadv2
 
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -34,6 +35,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
@@ -375,12 +377,17 @@ private fun StatusBarIcon(
             }
 
             is Downloader.DownloadTask.State.Status.Running -> {
+                val animatedProgressValue by animateFloatAsState(
+                    targetValue = status.progress,
+                    animationSpec = ProgressIndicatorDefaults.ProgressAnimationSpec
+                )
+
                 CircularProgressIndicator(
                     modifier = Modifier
                         .size(iconSize)
                         .padding(1.dp)
                         .align(Alignment.Center),
-                    progress = status.progress,
+                    progress = animatedProgressValue,
                     strokeWidth = 2.5f.dp
                 )
             }
