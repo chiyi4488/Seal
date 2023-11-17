@@ -64,6 +64,7 @@ fun dynamicColorScheme(isLight: Boolean = !isSystemInDarkTheme()): ColorScheme {
             surfaceContainer = 94.n1,
             surfaceContainerHigh = 92.n1,
             surfaceContainerHighest = 90.n1,
+            surfaceTint = 40.a1,
         )
     } else {
         darkColorScheme(
@@ -98,6 +99,7 @@ fun dynamicColorScheme(isLight: Boolean = !isSystemInDarkTheme()): ColorScheme {
             surfaceContainer = 12.n1,
             surfaceContainerHigh = 17.n1,
             surfaceContainerHighest = 22.n1,
+            surfaceTint = 40.a1,
         )
     }
 }

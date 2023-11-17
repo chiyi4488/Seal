@@ -168,7 +168,7 @@ fun FilterChipWithIcon(
     selectedIcon: ImageVector? = null
 ) {
     FilterChip(
-        modifier = modifier.padding(horizontal = 4.dp),
+        modifier = modifier,
         selected = selected, enabled = enabled,
         onClick = onClick,
         label = {

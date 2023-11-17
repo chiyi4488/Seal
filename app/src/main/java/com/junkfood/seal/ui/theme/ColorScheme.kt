@@ -114,6 +114,7 @@ fun TonalPalettes.toDynamicColorScheme(isLight: Boolean = !isSystemInDarkTheme()
             surfaceContainer = this neutral1 94.0,
             surfaceContainerHigh = this neutral1 92.0,
             surfaceContainerHighest = this neutral1 90.0,
+            surfaceTint = this accent1 40.0,
         )
     } else {
         darkColorScheme(
@@ -148,6 +149,7 @@ fun TonalPalettes.toDynamicColorScheme(isLight: Boolean = !isSystemInDarkTheme()
             surfaceContainer = this neutral1 12.0,
             surfaceContainerHigh = this neutral1 17.0,
             surfaceContainerHighest = this neutral1 22.0,
+            surfaceTint = this accent1 40.0,
         )
     }
 }
